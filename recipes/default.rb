@@ -39,26 +39,41 @@ chef_gem 'influxdb' do
   source influxdb_gem.path unless influxdb_gem.nil?
 end
 
-if platform_family? 'rhel'
-  yum_repository 'influxdb' do
-    description 'InfluxDB Repository - RHEL \$releasever'
-    baseurl 'https://repos.influxdata.com/centos/\$releasever/\$basearch/stable'
-    gpgkey 'https://repos.influxdata.com/influxdb.key'
+# Apt repo doesn't have old releases, so install directly from a .deb if a version is specified
+# https://github.com/influxdata/influxdb/issues/5913
+if !platform_family?('rhel') && node['influxdb']['version']
+  influxdb_deb = remote_file "#{Chef::Config[:file_cache_path]}/influxdb_#{node['influxdb']['version']}_amd64.deb" do
+    source "https://influxdb.s3.amazonaws.com/influxdb_#{node['influxdb']['version']}_amd64.deb"
+    checksum node['influxdb']['checksum']
+    action :create_if_missing
+  end
+
+  dpkg_package 'influxdb' do
+    source influxdb_deb.path
+    action :install
   end
 else
-  package 'apt-transport-https'
+  if platform_family? 'rhel'
+    yum_repository 'influxdb' do
+      description 'InfluxDB Repository - RHEL \$releasever'
+      baseurl 'https://repos.influxdata.com/centos/\$releasever/\$basearch/stable'
+      gpgkey 'https://repos.influxdata.com/influxdb.key'
+    end
+  else
+    package 'apt-transport-https'
 
-  apt_repository 'influxdb' do
-    uri "https://repos.influxdata.com/#{node['platform']}"
-    distribution node['lsb']['codename']
-    components ['stable']
-    arch 'amd64'
-    key 'https://repos.influxdata.com/influxdb.key'
+    apt_repository 'influxdb' do
+      uri "https://repos.influxdata.com/#{node['platform']}"
+      distribution node['lsb']['codename']
+      components ['stable']
+      arch 'amd64'
+      key 'https://repos.influxdata.com/influxdb.key'
+    end
   end
-end
 
-package 'influxdb' do
-  version node['influxdb']['version']
+  package 'influxdb' do
+    version node['influxdb']['version']
+  end
 end
 
 influxdb_config node['influxdb']['config_file_path'] do

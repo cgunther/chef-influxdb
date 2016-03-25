@@ -21,6 +21,7 @@
 
 # By default, always installs the latest by specifying nil
 default['influxdb']['version'] = nil
+default['influxdb']['checksum'] = nil
 
 # Grab clients -- right now only supports Ruby and CLI
 default['influxdb']['client']['cli']['enable'] = false
